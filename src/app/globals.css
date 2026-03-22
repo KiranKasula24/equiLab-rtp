@@ -1,0 +1,63 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Surface */
+  --bg-base:      #0b0e11;
+  --bg-surface:   #131720;
+  --bg-elevated:  #1a2030;
+  --bg-hover:     #1f2840;
+  --bg-border:    #252d3d;
+
+  /* Text */
+  --text-primary:   #e8ecf0;
+  --text-secondary: #7a8899;
+  --text-muted:     #4a5568;
+
+  /* Brand */
+  --accent:         #3b82f6;
+  --accent-dim:     #1e3a5f;
+
+  /* P&L */
+  --gain:           #22c55e;
+  --gain-dim:       #14532d;
+  --gain-text:      #4ade80;
+  --loss:           #ef4444;
+  --loss-dim:       #450a0a;
+  --loss-text:      #f87171;
+
+  /* Typography */
+  --font-sans: 'DM Sans', sans-serif;
+  --font-mono: 'DM Mono', monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* All numbers everywhere use monospace */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.gain { color: var(--gain-text); }
+.loss { color: var(--loss-text); }
+.muted { color: var(--text-secondary); }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--bg-base); }
+::-webkit-scrollbar-thumb { background: var(--bg-border); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
