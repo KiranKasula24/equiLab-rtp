@@ -1,7 +1,7 @@
 const MOCK_MODE = process.env.ANGEL_ONE_MOCK_MODE !== "false";
 const BASE_URL = "https://apiconnect.angelbroking.com";
 
-type QuoteResult = {
+export type QuoteResult = {
   symbol: string;
   ltp: number;
   open: number;
@@ -13,7 +13,7 @@ type QuoteResult = {
   volume: number;
 };
 
-type CandleResult = {
+export type CandleResult = {
   timestamp: string;
   open: number;
   high: number;
@@ -22,48 +22,149 @@ type CandleResult = {
   volume: number;
 };
 
-type SearchResult = {
+export type SearchResult = {
   symbol: string;
   name: string;
   exchange: string;
+  sector: string;
 };
 
-const MOCK_QUOTES: Record<string, number> = {
-  RELIANCE: 2945.5,
-  TCS: 3821.0,
-  INFY: 1456.75,
-  HDFCBANK: 1623.4,
-  ICICIBANK: 1089.2,
-  WIPRO: 456.3,
-  SBIN: 812.6,
-  BAJFINANCE: 6892.0,
-  TATAMOTORS: 978.45,
-  ADANIENT: 2341.8,
+// ----- Mock data -----
+
+export const SYMBOL_META: Record<
+  string,
+  { name: string; exchange: string; sector: string; base: number }
+> = {
+  RELIANCE: {
+    name: "Reliance Industries Ltd",
+    exchange: "NSE",
+    sector: "Energy",
+    base: 2945,
+  },
+  TCS: {
+    name: "Tata Consultancy Services",
+    exchange: "NSE",
+    sector: "IT",
+    base: 3821,
+  },
+  INFY: { name: "Infosys Ltd", exchange: "NSE", sector: "IT", base: 1456 },
+  HDFCBANK: {
+    name: "HDFC Bank Ltd",
+    exchange: "NSE",
+    sector: "Banking",
+    base: 1623,
+  },
+  ICICIBANK: {
+    name: "ICICI Bank Ltd",
+    exchange: "NSE",
+    sector: "Banking",
+    base: 1089,
+  },
+  WIPRO: { name: "Wipro Ltd", exchange: "NSE", sector: "IT", base: 456 },
+  SBIN: {
+    name: "State Bank of India",
+    exchange: "NSE",
+    sector: "Banking",
+    base: 812,
+  },
+  BAJFINANCE: {
+    name: "Bajaj Finance Ltd",
+    exchange: "NSE",
+    sector: "Finance",
+    base: 6892,
+  },
+  TATAMOTORS: {
+    name: "Tata Motors Ltd",
+    exchange: "NSE",
+    sector: "Auto",
+    base: 978,
+  },
+  ADANIENT: {
+    name: "Adani Enterprises Ltd",
+    exchange: "NSE",
+    sector: "Conglomerate",
+    base: 2341,
+  },
+  KOTAKBANK: {
+    name: "Kotak Mahindra Bank Ltd",
+    exchange: "NSE",
+    sector: "Banking",
+    base: 1780,
+  },
+  LT: {
+    name: "Larsen & Toubro Ltd",
+    exchange: "NSE",
+    sector: "Infrastructure",
+    base: 3510,
+  },
+  MARUTI: {
+    name: "Maruti Suzuki India Ltd",
+    exchange: "NSE",
+    sector: "Auto",
+    base: 12400,
+  },
+  SUNPHARMA: {
+    name: "Sun Pharmaceutical Industries",
+    exchange: "NSE",
+    sector: "Pharma",
+    base: 1625,
+  },
+  HINDUNILVR: {
+    name: "Hindustan Unilever Ltd",
+    exchange: "NSE",
+    sector: "FMCG",
+    base: 2380,
+  },
+  ASIANPAINT: {
+    name: "Asian Paints Ltd",
+    exchange: "NSE",
+    sector: "Consumer",
+    base: 2850,
+  },
+  AXISBANK: {
+    name: "Axis Bank Ltd",
+    exchange: "NSE",
+    sector: "Banking",
+    base: 1120,
+  },
+  TITAN: {
+    name: "Titan Company Ltd",
+    exchange: "NSE",
+    sector: "Consumer",
+    base: 3450,
+  },
+  ULTRACEMCO: {
+    name: "UltraTech Cement Ltd",
+    exchange: "NSE",
+    sector: "Cement",
+    base: 10200,
+  },
+  ONGC: {
+    name: "Oil & Natural Gas Corporation",
+    exchange: "NSE",
+    sector: "Energy",
+    base: 275,
+  },
 };
-
-const MOCK_SEARCH: SearchResult[] = [
-  { symbol: "RELIANCE", name: "Reliance Industries Ltd", exchange: "NSE" },
-  { symbol: "TCS", name: "Tata Consultancy Services", exchange: "NSE" },
-  { symbol: "INFY", name: "Infosys Ltd", exchange: "NSE" },
-  { symbol: "HDFCBANK", name: "HDFC Bank Ltd", exchange: "NSE" },
-  { symbol: "ICICIBANK", name: "ICICI Bank Ltd", exchange: "NSE" },
-  { symbol: "WIPRO", name: "Wipro Ltd", exchange: "NSE" },
-  { symbol: "SBIN", name: "State Bank of India", exchange: "NSE" },
-  { symbol: "BAJFINANCE", name: "Bajaj Finance Ltd", exchange: "NSE" },
-  { symbol: "TATAMOTORS", name: "Tata Motors Ltd", exchange: "NSE" },
-  { symbol: "ADANIENT", name: "Adani Enterprises Ltd", exchange: "NSE" },
-];
-
-let authToken: string | null = null;
-let tokenExpiry = 0;
 
 function round2(value: number): number {
   return Number(value.toFixed(2));
 }
 
+// Seeded price fluctuation so mock prices are consistent within a session
+const sessionSeed = Date.now();
+function seededRand(symbol: string, salt: number): number {
+  let h = sessionSeed + salt;
+  for (const c of symbol) h = Math.imul(h ^ c.charCodeAt(0), 0x9e3779b9);
+  h ^= h >>> 16;
+  return (h >>> 0) / 0xffffffff;
+}
+
 function getMockQuote(symbol: string): QuoteResult {
-  const base = MOCK_QUOTES[symbol.toUpperCase()] ?? 1000;
-  const fluctuation = (Math.random() - 0.5) * base * 0.02;
+  const meta = SYMBOL_META[symbol.toUpperCase()];
+  const base = meta?.base ?? 1000;
+  const rand = seededRand(symbol, Math.floor(Date.now() / 60_000)); // changes every minute
+  const fluctuation = (rand - 0.5) * base * 0.02;
   const ltp = round2(base + fluctuation);
   const prevClose = base;
   const change = round2(ltp - prevClose);
@@ -71,34 +172,40 @@ function getMockQuote(symbol: string): QuoteResult {
   return {
     symbol,
     ltp,
-    open: round2(base * 0.998),
-    high: round2(base * 1.012),
-    low: round2(base * 0.991),
+    open: round2(base * 0.998 + (seededRand(symbol, 1) - 0.5) * base * 0.005),
+    high: round2(ltp * (1 + seededRand(symbol, 2) * 0.012)),
+    low: round2(ltp * (1 - seededRand(symbol, 3) * 0.012)),
     close: prevClose,
     change,
     changePct: round2((change / prevClose) * 100),
-    volume: Math.floor(Math.random() * 5_000_000) + 500_000,
+    volume: Math.floor(seededRand(symbol, 4) * 4_000_000) + 500_000,
   };
 }
 
-function getMockCandles(symbol: string, days = 90): CandleResult[] {
-  const base = MOCK_QUOTES[symbol.toUpperCase()] ?? 1000;
+function getMockCandles(symbol: string, days = 180): CandleResult[] {
+  const meta = SYMBOL_META[symbol.toUpperCase()];
+  const base = meta?.base ?? 1000;
   const candles: CandleResult[] = [];
-  let price = base * 0.85;
 
-  for (let i = days; i >= 0; i -= 1) {
+  // Simulate a trending price walk
+  let price = round2(base * 0.78);
+  const trend = base > 3000 ? 0.0008 : 0.0006; // slight upward bias
+
+  for (let i = days; i >= 0; i--) {
     const date = new Date();
     date.setDate(date.getDate() - i);
+    const day = date.getDay();
+    if (day === 0 || day === 6) continue;
 
-    if (date.getDay() === 0 || date.getDay() === 6) {
-      continue;
-    }
+    const rand1 = seededRand(symbol, i);
+    const rand2 = seededRand(symbol, i + 1000);
+    const rand3 = seededRand(symbol, i + 2000);
 
+    const dailyReturn = (rand1 - 0.48 + trend) * 0.025;
     const open = price;
-    const change = (Math.random() - 0.48) * price * 0.025;
-    const close = round2(open + change);
-    const high = round2(Math.max(open, close) * (1 + Math.random() * 0.01));
-    const low = round2(Math.min(open, close) * (1 - Math.random() * 0.01));
+    const close = round2(open * (1 + dailyReturn));
+    const high = round2(Math.max(open, close) * (1 + rand2 * 0.008));
+    const low = round2(Math.min(open, close) * (1 - rand3 * 0.008));
     price = close;
 
     candles.push({
@@ -107,25 +214,72 @@ function getMockCandles(symbol: string, days = 90): CandleResult[] {
       high,
       low,
       close,
-      volume: Math.floor(Math.random() * 3_000_000) + 200_000,
+      volume: Math.floor(rand1 * 3_000_000) + 200_000,
     });
   }
 
   return candles;
 }
 
+// ----- Angel One auth -----
+
+let authToken: string | null = null;
+let tokenExpiry = 0;
+
 async function parseJson<T>(response: Response): Promise<T> {
-  const data = (await response.json()) as T;
-  return data;
+  return (await response.json()) as T;
+}
+
+async function generateTOTP(secret: string): Promise<string> {
+  if (!secret) throw new Error("ANGEL_ONE_TOTP_SECRET is missing");
+
+  const base32Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  const secretBytes = new Uint8Array(
+    secret
+      .toUpperCase()
+      .replace(/=+$/, "")
+      .split("")
+      .map((c) => base32Chars.indexOf(c))
+      .reduce((acc: number[], value, index) => {
+        const byteIndex = Math.floor((index * 5) / 8);
+        const bitOffset = (index * 5) % 8;
+        if (acc[byteIndex] === undefined) acc[byteIndex] = 0;
+        acc[byteIndex] |= value << (3 - bitOffset);
+        if (bitOffset > 3 && acc[byteIndex + 1] === undefined)
+          acc[byteIndex + 1] = value << (11 - bitOffset);
+        return acc;
+      }, []),
+  );
+
+  const counter = Math.floor(Date.now() / 1000 / 30);
+  const counterBuffer = new ArrayBuffer(8);
+  new DataView(counterBuffer).setUint32(4, counter, false);
+
+  const key = await crypto.subtle.importKey(
+    "raw",
+    secretBytes,
+    { name: "HMAC", hash: "SHA-1" },
+    false,
+    ["sign"],
+  );
+  const hash = new Uint8Array(
+    await crypto.subtle.sign("HMAC", key, counterBuffer),
+  );
+  const offset = hash[19] & 0xf;
+  const otp =
+    (((hash[offset] & 0x7f) << 24) |
+      ((hash[offset + 1] & 0xff) << 16) |
+      ((hash[offset + 2] & 0xff) << 8) |
+      (hash[offset + 3] & 0xff)) %
+    1_000_000;
+
+  return otp.toString().padStart(6, "0");
 }
 
 async function getAuthToken(): Promise<string> {
-  if (authToken && Date.now() < tokenExpiry) {
-    return authToken;
-  }
+  if (authToken && Date.now() < tokenExpiry) return authToken;
 
   const totp = await generateTOTP(process.env.ANGEL_ONE_TOTP_SECRET ?? "");
-
   const response = await fetch(
     `${BASE_URL}/rest/auth/angelbroking/user/v1/loginByPassword`,
     {
@@ -149,98 +303,39 @@ async function getAuthToken(): Promise<string> {
   );
 
   const payload = await parseJson<{ data?: { jwtToken?: string } }>(response);
-
-  if (!payload.data?.jwtToken) {
+  if (!payload.data?.jwtToken)
     throw new Error("Angel One authentication failed");
-  }
 
   authToken = payload.data.jwtToken;
   tokenExpiry = Date.now() + 23 * 60 * 60 * 1000;
-
   return authToken;
 }
 
-async function generateTOTP(secret: string): Promise<string> {
-  if (!secret) {
-    throw new Error("ANGEL_ONE_TOTP_SECRET is missing");
-  }
+// ----- Public API -----
 
-  const base32Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-
-  const secretBytes = new Uint8Array(
-    secret
-      .toUpperCase()
-      .replace(/=+$/, "")
-      .split("")
-      .map((char) => {
-        const index = base32Chars.indexOf(char);
-        return index === -1 ? 0 : index;
-      })
-      .reduce((acc: number[], value, index) => {
-        const byteIndex = Math.floor((index * 5) / 8);
-        const bitOffset = (index * 5) % 8;
-
-        if (acc[byteIndex] === undefined) {
-          acc[byteIndex] = 0;
-        }
-
-        acc[byteIndex] |= value << (3 - bitOffset);
-
-        if (bitOffset > 3 && acc[byteIndex + 1] === undefined) {
-          acc[byteIndex + 1] = value << (11 - bitOffset);
-        }
-
-        return acc;
-      }, []),
-  );
-
-  const counter = Math.floor(Date.now() / 1000 / 30);
-  const counterBuffer = new ArrayBuffer(8);
-  const counterView = new DataView(counterBuffer);
-  counterView.setUint32(4, counter, false);
-
-  const key = await crypto.subtle.importKey(
-    "raw",
-    secretBytes,
-    { name: "HMAC", hash: "SHA-1" },
-    false,
-    ["sign"],
-  );
-
-  const signature = await crypto.subtle.sign("HMAC", key, counterBuffer);
-  const hash = new Uint8Array(signature);
-  const offset = hash[19] & 0xf;
-
-  const otp =
-    (((hash[offset] & 0x7f) << 24) |
-      ((hash[offset + 1] & 0xff) << 16) |
-      ((hash[offset + 2] & 0xff) << 8) |
-      (hash[offset + 3] & 0xff)) %
-    1_000_000;
-
-  return otp.toString().padStart(6, "0");
-}
-
-export async function getQuote(symbol: string, exchange = "NSE"): Promise<QuoteResult> {
-  if (MOCK_MODE) {
-    return getMockQuote(symbol);
-  }
+export async function getQuote(
+  symbol: string,
+  exchange = "NSE",
+): Promise<QuoteResult> {
+  if (MOCK_MODE) return getMockQuote(symbol);
 
   const token = await getAuthToken();
-
-  const response = await fetch(`${BASE_URL}/rest/secure/angelbroking/market/v1/quote/`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      "X-PrivateKey": process.env.ANGEL_ONE_API_KEY ?? "",
+  const response = await fetch(
+    `${BASE_URL}/rest/secure/angelbroking/market/v1/quote/`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "X-PrivateKey": process.env.ANGEL_ONE_API_KEY ?? "",
+      },
+      body: JSON.stringify({
+        mode: "FULL",
+        exchangeTokens: { [exchange]: [symbol] },
+      }),
     },
-    body: JSON.stringify({
-      mode: "FULL",
-      exchangeTokens: { [exchange]: [symbol] },
-    }),
-  });
+  );
 
   const payload = await parseJson<{
     data?: {
@@ -258,10 +353,7 @@ export async function getQuote(symbol: string, exchange = "NSE"): Promise<QuoteR
   }>(response);
 
   const quote = payload.data?.fetched?.[0];
-
-  if (!quote) {
-    throw new Error(`Quote not found for ${symbol}`);
-  }
+  if (!quote) throw new Error(`Quote not found for ${symbol}`);
 
   return {
     symbol,
@@ -283,12 +375,9 @@ export async function getCandles(
   from: string,
   to: string,
 ): Promise<CandleResult[]> {
-  if (MOCK_MODE) {
-    return getMockCandles(symbol);
-  }
+  if (MOCK_MODE) return getMockCandles(symbol);
 
   const token = await getAuthToken();
-
   const response = await fetch(
     `${BASE_URL}/rest/secure/angelbroking/historical/v1/getCandleData`,
     {
@@ -308,29 +397,40 @@ export async function getCandles(
     },
   );
 
-  const payload = await parseJson<{ data?: Array<[string, number, number, number, number, number]> }>(response);
-
-  return (payload.data ?? []).map(([timestamp, open, high, low, close, volume]) => ({
-    timestamp: new Date(timestamp).toISOString(),
-    open,
-    high,
-    low,
-    close,
-    volume,
-  }));
+  const payload = await parseJson<{
+    data?: Array<[string, number, number, number, number, number]>;
+  }>(response);
+  return (payload.data ?? []).map(
+    ([timestamp, open, high, low, close, volume]) => ({
+      timestamp: new Date(timestamp).toISOString(),
+      open,
+      high,
+      low,
+      close,
+      volume,
+    }),
+  );
 }
 
 export async function searchSymbols(query: string): Promise<SearchResult[]> {
   if (MOCK_MODE) {
-    return MOCK_SEARCH.filter(
-      (item) =>
-        item.symbol.includes(query.toUpperCase()) ||
-        item.name.toLowerCase().includes(query.toLowerCase()),
-    );
+    const q = query.toUpperCase();
+    return Object.entries(SYMBOL_META)
+      .filter(
+        ([sym, meta]) =>
+          sym.includes(q) ||
+          meta.name.toLowerCase().includes(query.toLowerCase()),
+      )
+      .map(([symbol, meta]) => ({
+        symbol,
+        name: meta.name,
+        exchange: meta.exchange,
+        sector: meta.sector,
+      }))
+      .slice(0, 10);
   }
 
   const token = await getAuthToken();
-
   const response = await fetch(
     `${BASE_URL}/rest/secure/angelbroking/order/v1/searchScrip`,
     {
@@ -345,16 +445,13 @@ export async function searchSymbols(query: string): Promise<SearchResult[]> {
   );
 
   const payload = await parseJson<{
-    data?: Array<{
-      tradingsymbol: string;
-      name: string;
-    }>;
+    data?: Array<{ tradingsymbol: string; name: string }>;
   }>(response);
-
   return (payload.data ?? []).map((item) => ({
     symbol: item.tradingsymbol,
     name: item.name,
     exchange: "NSE",
+    sector: SYMBOL_META[item.tradingsymbol]?.sector ?? "Other",
   }));
 }
 
@@ -362,14 +459,9 @@ export function isMarketOpen(): boolean {
   const now = new Date();
   const utcMillis = now.getTime() + now.getTimezoneOffset() * 60 * 1000;
   const ist = new Date(utcMillis + 5.5 * 60 * 60 * 1000);
-
   const day = ist.getUTCDay();
-  const hour = ist.getUTCHours();
-  const minute = ist.getUTCMinutes();
-  const minutes = hour * 60 + minute;
-
-  const openMinutes = 9 * 60 + 15;
-  const closeMinutes = 15 * 60 + 30;
-
-  return day >= 1 && day <= 5 && minutes >= openMinutes && minutes <= closeMinutes;
+  const minutes = ist.getUTCHours() * 60 + ist.getUTCMinutes();
+  return (
+    day >= 1 && day <= 5 && minutes >= 9 * 60 + 15 && minutes <= 15 * 60 + 30
+  );
 }

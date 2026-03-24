@@ -3,8 +3,10 @@ import { connectDB } from "@/lib/db";
 import { getQuote } from "@/lib/angelone";
 import { Order } from "@/models/Order";
 import { Trade } from "@/models/Trade";
+import { Snapshot } from "@/models/Snapshot";
 import { CONSTANTS, PlaceOrderInput } from "@/types";
 import { creditCash, debitCash, getCashBalance } from "./ledger.service";
+import { getPortfolioSummary } from "./portfolio.service";
 
 function round2(value: number): number {
   return Number(value.toFixed(2));
@@ -15,13 +17,27 @@ function calculateFees(side: "buy" | "sell", totalValue: number) {
     CONSTANTS.MAX_COMMISSION,
     totalValue * CONSTANTS.INTRADAY_COMMISSION_PCT,
   );
-
   const stt = side === "sell" ? totalValue * CONSTANTS.STT_DELIVERY_PCT : 0;
+  return { commission: round2(commission), stt: round2(stt) };
+}
 
-  return {
-    commission: round2(commission),
-    stt: round2(stt),
-  };
+async function saveSnapshot(userId: string): Promise<void> {
+  try {
+    const summary = await getPortfolioSummary(userId);
+    const date = new Date().toISOString().split("T")[0];
+    await Snapshot.findOneAndUpdate(
+      { userId: new Types.ObjectId(userId), date },
+      {
+        totalValue: summary.totalValue,
+        cashBalance: summary.cashBalance,
+        holdingsValue: summary.holdingsValue,
+        realisedPnl: summary.realisedPnl,
+      },
+      { upsert: true },
+    );
+  } catch {
+    // Non-fatal — snapshot failure should never block order execution
+  }
 }
 
 export async function placeOrder(userId: string, input: PlaceOrderInput) {
@@ -47,10 +63,11 @@ export async function placeOrder(userId: string, input: PlaceOrderInput) {
         totalValue,
         commissionFee: commission,
         stt,
-        rejectionReason: `Insufficient buying power. Required INR ${totalCost.toLocaleString("en-IN")}, available INR ${cashBalance.toLocaleString("en-IN")}`,
+        rejectionReason: `Insufficient buying power. Required ₹${totalCost.toLocaleString("en-IN")}, available ₹${cashBalance.toLocaleString("en-IN")}`,
       });
-
-      throw new Error("Insufficient buying power");
+      throw new Error(
+        `Insufficient buying power. Required ₹${totalCost.toLocaleString("en-IN")}`,
+      );
     }
   }
 
@@ -70,16 +87,16 @@ export async function placeOrder(userId: string, input: PlaceOrderInput) {
         stt,
         rejectionReason: `Insufficient holdings. Current quantity: ${position?.quantity ?? 0}`,
       });
-
-      throw new Error("Insufficient holdings");
+      throw new Error(
+        `Insufficient holdings. You hold ${position?.quantity ?? 0} shares.`,
+      );
     }
   }
 
   const session = await mongoose.startSession();
+  let createdOrder: unknown;
 
   try {
-    let createdOrder: unknown;
-
     await session.withTransaction(async () => {
       const orderDocs = await Order.create(
         [
@@ -124,7 +141,7 @@ export async function placeOrder(userId: string, input: PlaceOrderInput) {
           userId,
           totalCost,
           order._id as Types.ObjectId,
-          `BUY ${input.quantity} x ${input.symbol} @ INR ${executedPrice.toLocaleString("en-IN")}`,
+          `BUY ${input.quantity} × ${input.symbol} @ ₹${executedPrice.toLocaleString("en-IN")}`,
           session,
         );
       } else {
@@ -133,18 +150,21 @@ export async function placeOrder(userId: string, input: PlaceOrderInput) {
           userId,
           netProceeds,
           order._id as Types.ObjectId,
-          `SELL ${input.quantity} x ${input.symbol} @ INR ${executedPrice.toLocaleString("en-IN")}`,
+          `SELL ${input.quantity} × ${input.symbol} @ ₹${executedPrice.toLocaleString("en-IN")}`,
           session,
         );
       }
 
       createdOrder = order.toObject();
     });
-
-    return createdOrder;
   } finally {
     session.endSession();
   }
+
+  // Snapshot after transaction completes (non-blocking)
+  void saveSnapshot(userId);
+
+  return createdOrder;
 }
 
 export async function getUserPosition(userId: string, symbol: string) {
@@ -172,10 +192,5 @@ export async function getUserPosition(userId: string, symbol: string) {
   }
 
   if (quantity <= 0) return null;
-
-  return {
-    symbol,
-    quantity,
-    avgCostPrice: round2(totalCost / quantity),
-  };
+  return { symbol, quantity, avgCostPrice: round2(totalCost / quantity) };
 }

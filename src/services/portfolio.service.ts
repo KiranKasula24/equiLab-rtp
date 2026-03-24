@@ -16,7 +16,10 @@ export async function getPositions(userId: string): Promise<IPosition[]> {
     userId: new Types.ObjectId(userId),
   }).lean();
 
-  const symbolMap: Record<string, { qty: number; cost: number; exchange: string }> = {};
+  const symbolMap: Record<
+    string,
+    { qty: number; cost: number; exchange: string }
+  > = {};
 
   for (const trade of trades) {
     if (!symbolMap[trade.symbol]) {
@@ -35,7 +38,9 @@ export async function getPositions(userId: string): Promise<IPosition[]> {
     }
   }
 
-  const openSymbols = Object.entries(symbolMap).filter(([, value]) => value.qty > 0);
+  const openSymbols = Object.entries(symbolMap).filter(
+    ([, value]) => value.qty > 0,
+  );
 
   if (!openSymbols.length) {
     return [];
@@ -48,7 +53,8 @@ export async function getPositions(userId: string): Promise<IPosition[]> {
       const currentValue = round2(quote.ltp * data.qty);
       const investedValue = round2(avgCostPrice * data.qty);
       const unrealisedPnl = round2(currentValue - investedValue);
-      const unrealisedPnlPct = investedValue > 0 ? round2((unrealisedPnl / investedValue) * 100) : 0;
+      const unrealisedPnlPct =
+        investedValue > 0 ? round2((unrealisedPnl / investedValue) * 100) : 0;
       const dayChange = round2(quote.change * data.qty);
 
       return {
@@ -102,16 +108,27 @@ export async function getRealisedPnl(userId: string): Promise<number> {
   return round2(realisedPnl);
 }
 
-export async function getPortfolioSummary(userId: string): Promise<IPortfolioSummary> {
+export async function getPortfolioSummary(
+  userId: string,
+): Promise<IPortfolioSummary> {
   const [cashBalance, positions, realisedPnl] = await Promise.all([
     getCashBalance(userId),
     getPositions(userId),
     getRealisedPnl(userId),
   ]);
 
-  const holdingsValue = positions.reduce((sum, item) => sum + item.currentValue, 0);
-  const totalInvested = positions.reduce((sum, item) => sum + item.investedValue, 0);
-  const unrealisedPnl = positions.reduce((sum, item) => sum + item.unrealisedPnl, 0);
+  const holdingsValue = positions.reduce(
+    (sum, item) => sum + item.currentValue,
+    0,
+  );
+  const totalInvested = positions.reduce(
+    (sum, item) => sum + item.investedValue,
+    0,
+  );
+  const unrealisedPnl = positions.reduce(
+    (sum, item) => sum + item.unrealisedPnl,
+    0,
+  );
   const dayPnl = positions.reduce((sum, item) => sum + item.dayChange, 0);
   const totalValue = cashBalance + holdingsValue;
 
@@ -121,7 +138,8 @@ export async function getPortfolioSummary(userId: string): Promise<IPortfolioSum
     totalValue: round2(totalValue),
     totalInvested: round2(totalInvested),
     unrealisedPnl: round2(unrealisedPnl),
-    unrealisedPnlPct: totalInvested > 0 ? round2((unrealisedPnl / totalInvested) * 100) : 0,
+    unrealisedPnlPct:
+      totalInvested > 0 ? round2((unrealisedPnl / totalInvested) * 100) : 0,
     realisedPnl: round2(realisedPnl),
     dayPnl: round2(dayPnl),
     positions,
@@ -137,8 +155,12 @@ export async function getAnalytics(userId: string): Promise<IAnalytics> {
     .sort({ createdAt: 1 })
     .lean();
 
-  const costBasis: Record<string, { qty: number; cost: number; firstBuy: Date }> = {};
-  const closedTrades: { symbol: string; pnl: number; holdingDays: number }[] = [];
+  const costBasis: Record<
+    string,
+    { qty: number; cost: number; firstBuy: Date }
+  > = {};
+  const closedTrades: { symbol: string; pnl: number; holdingDays: number }[] =
+    [];
 
   for (const trade of trades) {
     if (!costBasis[trade.symbol]) {
@@ -161,7 +183,8 @@ export async function getAnalytics(userId: string): Promise<IAnalytics> {
         trade.stt;
 
       const holdingDays = Math.floor(
-        (trade.createdAt.getTime() - basis.firstBuy.getTime()) / (1000 * 60 * 60 * 24),
+        (trade.createdAt.getTime() - basis.firstBuy.getTime()) /
+          (1000 * 60 * 60 * 24),
       );
 
       closedTrades.push({ symbol: trade.symbol, pnl, holdingDays });
@@ -184,16 +207,20 @@ export async function getAnalytics(userId: string): Promise<IAnalytics> {
   const winners = closedTrades.filter((trade) => trade.pnl > 0);
   const winRate = round2((winners.length / closedTrades.length) * 100);
   const avgHoldingDays = Math.round(
-    closedTrades.reduce((sum, trade) => sum + trade.holdingDays, 0) / closedTrades.length,
+    closedTrades.reduce((sum, trade) => sum + trade.holdingDays, 0) /
+      closedTrades.length,
   );
 
   const returns = closedTrades.map((trade) => trade.pnl);
-  const avgReturn = returns.reduce((sum, value) => sum + value, 0) / returns.length;
+  const avgReturn =
+    returns.reduce((sum, value) => sum + value, 0) / returns.length;
   const variance =
-    returns.reduce((sum, value) => sum + (value - avgReturn) ** 2, 0) / returns.length;
+    returns.reduce((sum, value) => sum + (value - avgReturn) ** 2, 0) /
+    returns.length;
   const stdDev = Math.sqrt(variance);
   const riskFreeDaily = 0.065 / 365;
-  const sharpeRatio = stdDev > 0 ? round2((avgReturn - riskFreeDaily) / stdDev) : 0;
+  const sharpeRatio =
+    stdDev > 0 ? round2((avgReturn - riskFreeDaily) / stdDev) : 0;
 
   const sorted = [...closedTrades].sort((a, b) => b.pnl - a.pnl);
 
