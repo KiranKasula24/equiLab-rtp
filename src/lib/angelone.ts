@@ -313,31 +313,142 @@ async function getAuthToken(): Promise<string> {
 
 // ----- Public API -----
 
+type SearchScripItem = {
+  tradingsymbol: string;
+  symboltoken: string;
+  name: string;
+  exch_seg?: string;
+  exchange?: string;
+};
+
+type ResolvedScrip = {
+  symboltoken: string;
+  tradingsymbol: string;
+  exchange: string;
+  name?: string;
+};
+
+const scripCache = new Map<string, ResolvedScrip>();
+
+function liveHeaders(token?: string): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    "X-UserType": "USER",
+    "X-SourceID": "WEB",
+    "X-ClientLocalIP": "127.0.0.1",
+    "X-ClientPublicIP": "127.0.0.1",
+    "X-MACAddress": "00:00:00:00:00:00",
+    "X-PrivateKey": process.env.ANGEL_ONE_API_KEY ?? "",
+  };
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  return headers;
+}
+
+function normalizeTradingSymbol(symbol: string): string {
+  return symbol.toUpperCase().split("-")[0];
+}
+
+function toAngelDateTime(value: string, endOfDay: boolean): string {
+  if (value.includes(":")) return value;
+  return `${value} ${endOfDay ? "15:30" : "09:15"}`;
+}
+
+async function searchScripLive(
+  query: string,
+  exchange = "NSE",
+): Promise<SearchScripItem[]> {
+  const token = await getAuthToken();
+  const response = await fetch(
+    `${BASE_URL}/rest/secure/angelbroking/order/v1/searchScrip`,
+    {
+      method: "POST",
+      headers: liveHeaders(token),
+      body: JSON.stringify({ exchange, searchscrip: query }),
+    },
+  );
+
+  const payload = await parseJson<{
+    status?: boolean;
+    message?: string;
+    data?: SearchScripItem[];
+  }>(response);
+
+  if (!response.ok) {
+    throw new Error(payload.message ?? "searchScrip request failed");
+  }
+
+  return payload.data ?? [];
+}
+
+async function resolveSymbolToken(
+  symbol: string,
+  exchange = "NSE",
+): Promise<ResolvedScrip> {
+  if (/^\d+$/.test(symbol)) {
+    return {
+      symboltoken: symbol,
+      tradingsymbol: symbol,
+      exchange,
+    };
+  }
+
+  const key = `${exchange}:${symbol.toUpperCase()}`;
+  const cached = scripCache.get(key);
+  if (cached) return cached;
+
+  const results = await searchScripLive(symbol, exchange);
+  const target = symbol.toUpperCase();
+
+  const exact =
+    results.find((item) => item.tradingsymbol.toUpperCase() === target) ??
+    results.find(
+      (item) => normalizeTradingSymbol(item.tradingsymbol) === target,
+    ) ??
+    results[0];
+
+  if (!exact?.symboltoken) {
+    throw new Error(`Symbol token not found for ${symbol}`);
+  }
+
+  const resolved: ResolvedScrip = {
+    symboltoken: exact.symboltoken,
+    tradingsymbol: exact.tradingsymbol,
+    exchange,
+    name: exact.name,
+  };
+
+  scripCache.set(key, resolved);
+  return resolved;
+}
+
 export async function getQuote(
   symbol: string,
   exchange = "NSE",
 ): Promise<QuoteResult> {
   if (MOCK_MODE) return getMockQuote(symbol);
 
+  const resolved = await resolveSymbolToken(symbol, exchange);
   const token = await getAuthToken();
   const response = await fetch(
     `${BASE_URL}/rest/secure/angelbroking/market/v1/quote/`,
     {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        "X-PrivateKey": process.env.ANGEL_ONE_API_KEY ?? "",
-      },
+      headers: liveHeaders(token),
       body: JSON.stringify({
         mode: "FULL",
-        exchangeTokens: { [exchange]: [symbol] },
+        exchangeTokens: { [exchange]: [resolved.symboltoken] },
       }),
     },
   );
 
   const payload = await parseJson<{
+    status?: boolean;
+    message?: string;
     data?: {
       fetched?: Array<{
         ltp: number;
@@ -352,11 +463,15 @@ export async function getQuote(
     };
   }>(response);
 
+  if (!response.ok || payload.status === false) {
+    throw new Error(payload.message ?? `Quote request failed for ${symbol}`);
+  }
+
   const quote = payload.data?.fetched?.[0];
   if (!quote) throw new Error(`Quote not found for ${symbol}`);
 
   return {
-    symbol,
+    symbol: resolved.tradingsymbol,
     ltp: quote.ltp,
     open: quote.open,
     high: quote.high,
@@ -377,29 +492,33 @@ export async function getCandles(
 ): Promise<CandleResult[]> {
   if (MOCK_MODE) return getMockCandles(symbol);
 
+  const resolved = await resolveSymbolToken(symbol, exchange);
   const token = await getAuthToken();
   const response = await fetch(
     `${BASE_URL}/rest/secure/angelbroking/historical/v1/getCandleData`,
     {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        "X-PrivateKey": process.env.ANGEL_ONE_API_KEY ?? "",
-      },
+      headers: liveHeaders(token),
       body: JSON.stringify({
         exchange,
-        symboltoken: symbol,
+        symboltoken: resolved.symboltoken,
         interval,
-        fromdate: from,
-        todate: to,
+        fromdate: toAngelDateTime(from, false),
+        todate: toAngelDateTime(to, true),
       }),
     },
   );
 
   const payload = await parseJson<{
+    status?: boolean;
+    message?: string;
     data?: Array<[string, number, number, number, number, number]>;
   }>(response);
+
+  if (!response.ok || payload.status === false) {
+    throw new Error(payload.message ?? `Candle request failed for ${symbol}`);
+  }
+
   return (payload.data ?? []).map(
     ([timestamp, open, high, low, close, volume]) => ({
       timestamp: new Date(timestamp).toISOString(),
@@ -430,29 +549,20 @@ export async function searchSymbols(query: string): Promise<SearchResult[]> {
       .slice(0, 10);
   }
 
-  const token = await getAuthToken();
-  const response = await fetch(
-    `${BASE_URL}/rest/secure/angelbroking/order/v1/searchScrip`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        "X-PrivateKey": process.env.ANGEL_ONE_API_KEY ?? "",
-      },
-      body: JSON.stringify({ exchange: "NSE", searchscrip: query }),
-    },
-  );
+  const results = await searchScripLive(query, "NSE");
 
-  const payload = await parseJson<{
-    data?: Array<{ tradingsymbol: string; name: string }>;
-  }>(response);
-  return (payload.data ?? []).map((item) => ({
-    symbol: item.tradingsymbol,
-    name: item.name,
-    exchange: "NSE",
-    sector: SYMBOL_META[item.tradingsymbol]?.sector ?? "Other",
-  }));
+  return results
+    .filter((item) => Boolean(item.tradingsymbol))
+    .slice(0, 10)
+    .map((item) => {
+      const normalized = normalizeTradingSymbol(item.tradingsymbol);
+      return {
+        symbol: normalized,
+        name: item.name,
+        exchange: "NSE",
+        sector: SYMBOL_META[normalized]?.sector ?? "Other",
+      };
+    });
 }
 
 export function isMarketOpen(): boolean {
@@ -465,3 +575,4 @@ export function isMarketOpen(): boolean {
     day >= 1 && day <= 5 && minutes >= 9 * 60 + 15 && minutes <= 15 * 60 + 30
   );
 }
+

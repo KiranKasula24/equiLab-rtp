@@ -48,28 +48,47 @@ export async function getPositions(userId: string): Promise<IPosition[]> {
 
   return Promise.all(
     openSymbols.map(async ([symbol, data]) => {
-      const quote = await getQuote(symbol, data.exchange);
       const avgCostPrice = round2(data.cost / data.qty);
-      const currentValue = round2(quote.ltp * data.qty);
-      const investedValue = round2(avgCostPrice * data.qty);
-      const unrealisedPnl = round2(currentValue - investedValue);
-      const unrealisedPnlPct =
-        investedValue > 0 ? round2((unrealisedPnl / investedValue) * 100) : 0;
-      const dayChange = round2(quote.change * data.qty);
 
-      return {
-        symbol,
-        exchange: data.exchange as "NSE" | "BSE",
-        quantity: data.qty,
-        avgCostPrice,
-        currentPrice: quote.ltp,
-        currentValue,
-        investedValue,
-        unrealisedPnl,
-        unrealisedPnlPct,
-        dayChange,
-        dayChangePct: quote.changePct,
-      };
+      try {
+        const quote = await getQuote(symbol, data.exchange);
+        const currentValue = round2(quote.ltp * data.qty);
+        const investedValue = round2(avgCostPrice * data.qty);
+        const unrealisedPnl = round2(currentValue - investedValue);
+        const unrealisedPnlPct =
+          investedValue > 0 ? round2((unrealisedPnl / investedValue) * 100) : 0;
+        const dayChange = round2(quote.change * data.qty);
+
+        return {
+          symbol,
+          exchange: data.exchange as "NSE" | "BSE",
+          quantity: data.qty,
+          avgCostPrice,
+          currentPrice: quote.ltp,
+          currentValue,
+          investedValue,
+          unrealisedPnl,
+          unrealisedPnlPct,
+          dayChange,
+          dayChangePct: quote.changePct,
+        };
+      } catch {
+        const currentValue = round2(avgCostPrice * data.qty);
+
+        return {
+          symbol,
+          exchange: data.exchange as "NSE" | "BSE",
+          quantity: data.qty,
+          avgCostPrice,
+          currentPrice: avgCostPrice,
+          currentValue,
+          investedValue: currentValue,
+          unrealisedPnl: 0,
+          unrealisedPnlPct: 0,
+          dayChange: 0,
+          dayChangePct: 0,
+        };
+      }
     }),
   );
 }
@@ -277,3 +296,4 @@ export async function getTradeHistory(
     totalPages: Math.ceil(total / limit),
   };
 }
+
