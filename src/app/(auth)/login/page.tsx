@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import BrandLogo from "@/components/BrandLogo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -37,101 +38,22 @@ export default function LoginPage() {
         display: "grid",
         placeItems: "center",
         padding: 24,
+        position: "relative",
       }}
     >
-      {/* Ambient glow blobs */}
-      <div
-        style={{
-          position: "fixed",
-          top: "10%",
-          left: "20%",
-          width: 400,
-          height: 400,
-          background:
-            "radial-gradient(circle, rgba(139,92,246,0.15) 0%, transparent 70%)",
-          pointerEvents: "none",
-          zIndex: 0,
-        }}
-      />
-      <div
-        style={{
-          position: "fixed",
-          bottom: "10%",
-          right: "15%",
-          width: 300,
-          height: 300,
-          background:
-            "radial-gradient(circle, rgba(99,51,220,0.1) 0%, transparent 70%)",
-          pointerEvents: "none",
-          zIndex: 0,
-        }}
-      />
+      <div className="auth-orb auth-orb-cyan" />
+      <div className="auth-orb auth-orb-violet" />
 
-      <div
-        style={{
-          position: "relative",
-          zIndex: 1,
-          width: "100%",
-          maxWidth: 420,
-          background: "rgba(255,255,255,0.04)",
-          backdropFilter: "blur(24px)",
-          WebkitBackdropFilter: "blur(24px)",
-          border: "1px solid rgba(139,92,246,0.3)",
-          borderRadius: 22,
-          padding: "36px 32px",
-          boxShadow:
-            "0 0 60px rgba(139,92,246,0.12), 0 24px 64px rgba(0,0,0,0.4)",
-        }}
-      >
-        {/* Logo mark */}
-        <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: 14,
-              margin: "0 auto 16px",
-              background: "linear-gradient(135deg, #8b5cf6, #6d28d9)",
-              boxShadow: "0 0 32px rgba(139,92,246,0.5)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <span
-              style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: 20,
-                fontWeight: 700,
-                color: "#fff",
-              }}
-            >
-              E
-            </span>
+      <div className="auth-shell">
+        <div style={{ textAlign: "center", marginBottom: 28 }}>
+          <div style={{ display: "inline-flex", marginBottom: 14 }}>
+            <BrandLogo size={54} showWordmark={false} />
           </div>
-          <h1
-            style={{
-              fontFamily: "var(--font-sans)",
-              fontSize: 24,
-              fontWeight: 700,
-              letterSpacing: "-0.03em",
-              color: "var(--text-primary)",
-            }}
-          >
-            EquiLab
-          </h1>
-          <p
-            style={{
-              fontSize: 13,
-              color: "var(--text-secondary)",
-              marginTop: 5,
-            }}
-          >
-            Paper trading · NSE &amp; BSE markets
-          </p>
+          <h1 className="auth-title">Welcome back</h1>
+          <p className="auth-subtitle">Trade smarter with your EquiLab workspace</p>
         </div>
 
-        <form onSubmit={onSubmit} style={{ display: "grid", gap: 16 }}>
+        <form onSubmit={onSubmit} style={{ display: "grid", gap: 15 }}>
           <div>
             <label className="label">Email address</label>
             <input
@@ -151,7 +73,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              placeholder="••••••••"
+              placeholder="Enter your password"
             />
           </div>
 
@@ -162,7 +84,7 @@ export default function LoginPage() {
                 borderRadius: "var(--r-md)",
                 fontSize: 13,
                 background: "var(--loss-dim)",
-                border: "1px solid rgba(244,63,94,0.35)",
+                border: "1px solid rgba(251,113,133,0.42)",
                 color: "var(--loss-text)",
                 fontWeight: 500,
               }}
@@ -175,29 +97,15 @@ export default function LoginPage() {
             className="btn btn-primary"
             type="submit"
             disabled={loading}
-            style={{ height: 44, fontSize: 15, marginTop: 4 }}
+            style={{ height: 46, fontSize: 15, marginTop: 2 }}
           >
-            {loading ? "Signing in…" : "Login →"}
+            {loading ? "Signing in..." : "Login"}
           </button>
         </form>
 
-        <p
-          style={{
-            textAlign: "center",
-            fontSize: 13,
-            color: "var(--text-secondary)",
-            marginTop: 24,
-          }}
-        >
+        <p className="auth-switch">
           No account?{" "}
-          <Link
-            href="/register"
-            style={{
-              color: "var(--accent-bright)",
-              fontWeight: 600,
-              textDecoration: "none",
-            }}
-          >
+          <Link href="/register" className="auth-link">
             Create one free
           </Link>
         </p>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import BrandLogo from "@/components/BrandLogo";
 
 const NAV = [
   { href: "/dashboard", label: "Overview" },
@@ -25,7 +26,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       .then((r) => r.json())
       .then((p) => p.success && setMkt(p.data));
 
-    // Silent token refresh every 12 min to avoid mid-session expiry
     const id = setInterval(
       () => fetch("/api/auth/refresh", { method: "POST" }),
       12 * 60 * 1000,
@@ -42,7 +42,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   return (
     <div style={{ minHeight: "100vh" }}>
-      {/* ── Header ── */}
       <header
         style={{
           position: "sticky",
@@ -51,79 +50,27 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "0 24px",
-          height: 58,
+          padding: "10px 24px",
+          minHeight: 68,
           gap: 16,
           flexWrap: "wrap",
-          background: "rgba(13,13,26,0.75)",
+          background:
+            "linear-gradient(180deg, rgba(9,14,34,0.9) 0%, rgba(9,14,34,0.7) 100%)",
           backdropFilter: "blur(24px)",
           WebkitBackdropFilter: "blur(24px)",
-          borderBottom: "1px solid rgba(139,92,246,0.18)",
-          boxShadow: "0 1px 0 0 rgba(139,92,246,0.08)",
+          borderBottom: "1px solid rgba(124,244,255,0.18)",
+          boxShadow:
+            "0 8px 24px rgba(5,12,28,0.45), inset 0 1px 0 rgba(131,247,255,0.08)",
         }}
       >
-        {/* Logo */}
         <Link
           href="/dashboard"
-          style={{
-            textDecoration: "none",
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-          }}
+          style={{ textDecoration: "none", display: "flex", alignItems: "center" }}
         >
-          <div
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: 8,
-              background: "linear-gradient(135deg, #8b5cf6, #6d28d9)",
-              boxShadow: "0 0 16px rgba(139,92,246,0.5)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <span
-              style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: 13,
-                fontWeight: 700,
-                color: "#fff",
-              }}
-            >
-              E
-            </span>
-          </div>
-          <span
-            style={{
-              fontFamily: "var(--font-sans)",
-              fontWeight: 700,
-              fontSize: 17,
-              color: "var(--text-primary)",
-              letterSpacing: "-0.02em",
-            }}
-          >
-            EquiLab
-          </span>
-          <span
-            style={{
-              fontSize: 10,
-              fontWeight: 600,
-              color: "var(--accent-bright)",
-              background: "var(--accent-dim)",
-              border: "1px solid var(--border-glow)",
-              borderRadius: 6,
-              padding: "2px 7px",
-              letterSpacing: ".06em",
-            }}
-          >
-            BETA
-          </span>
+          <BrandLogo size={34} showWordmark showTag wordmarkSize={20} />
         </Link>
 
-        {/* Nav */}
-        <nav style={{ display: "flex", gap: 4 }}>
+        <nav style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {NAV.map(({ href, label }) => (
             <Link
               key={href}
@@ -135,26 +82,29 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           ))}
         </nav>
 
-        {/* Right */}
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           {mkt && (
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 7,
+                gap: 8,
                 fontSize: 12,
+                padding: "7px 10px",
+                borderRadius: 999,
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(126,243,255,0.16)",
               }}
             >
               <span
                 style={{
-                  width: 7,
-                  height: 7,
+                  width: 8,
+                  height: 8,
                   borderRadius: "50%",
                   background: mkt.isOpen ? "var(--gain)" : "var(--loss)",
                   boxShadow: mkt.isOpen
-                    ? "0 0 8px var(--gain)"
-                    : "0 0 8px var(--loss)",
+                    ? "0 0 10px var(--gain)"
+                    : "0 0 10px var(--loss)",
                   display: "inline-block",
                   flexShrink: 0,
                 }}
@@ -162,23 +112,21 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               <span
                 style={{
                   color: mkt.isOpen ? "var(--gain-text)" : "var(--loss-text)",
-                  fontWeight: 500,
+                  fontWeight: 600,
                 }}
               >
                 {mkt.isOpen ? "Open" : "Closed"}
               </span>
-              <span style={{ color: "var(--text-muted)" }}>
-                {mkt.istTime} IST
-              </span>
+              <span style={{ color: "var(--text-muted)" }}>{mkt.istTime} IST</span>
             </div>
           )}
           <button
             className="btn btn-ghost"
-            style={{ height: 32, fontSize: 13, padding: "0 14px" }}
+            style={{ height: 34, fontSize: 13, padding: "0 14px" }}
             onClick={logout}
             disabled={out}
           >
-            {out ? "…" : "Logout"}
+            {out ? "..." : "Logout"}
           </button>
         </div>
       </header>
